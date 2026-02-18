@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - '../../.docker/**'
-      - '.github/workflows/docker-publish.yml'
+      - '.docker-publish.yml'
       - 'Dockerfile'
   workflow_dispatch:
 
