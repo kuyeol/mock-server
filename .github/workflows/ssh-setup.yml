@@ -38,11 +38,11 @@ jobs:
       - name: Register public key to server
         run: |
           PUB_KEY=$(cat ~/.ssh/deploy_key.pub)
-          
+      
           sshpass -p "9306God!!" \
             ssh -o StrictHostKeyChecking=no \
                 -p "1202" \
-                "182.218.135.247" \
+                "ung@182.218.135.247" \
                 "mkdir -p ~/.ssh && \
                  chmod 700 ~/.ssh && \
                  echo '$PUB_KEY' >> ~/.ssh/authorized_keys && \
