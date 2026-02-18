@@ -41,8 +41,8 @@ jobs:
      
           sshpass -p ${{secrets.DEPLOY_PASSWORD }} \
             ssh -o StrictHostKeyChecking=no \
-                -p "1202" \
-                "ung@182.218.135.247" \
+                -p ${{vars.DEPLOY_SSH_PORT}} \
+                ${{vars.DEPLOY_HOST}} \
                 "mkdir -p ~/.ssh && \
                  chmod 700 ~/.ssh && \
                  echo '$PUB_KEY' >> ~/.ssh/authorized_keys && \
@@ -54,8 +54,8 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
-              -p ${{ env.DEPLOY_SSH_PORT }} \
-              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              -p ${{ vars.DEPLOY_SSH_PORT }} \
+              ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
               "echo '✅ Key auth success'"
 
       # ── 4. 개인키 → GitHub Secret 자동 저장 ─────────
