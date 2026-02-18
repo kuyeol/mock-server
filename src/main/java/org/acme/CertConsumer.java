@@ -1,13 +1,12 @@
 package org.acme;
 
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import org.acme.model.StoredKeyPair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.charset.StandardCharsets;
 
 @Path("api/key")
 public class CertConsumer {
@@ -21,8 +20,9 @@ public class CertConsumer {
     }
 
     @POST
-    public void listenKey(StoredKeyPair key) {
-        log.info(" received {}", key);
+    @Consumes(MediaType.APPLICATION_JSON)
+    public void listenKey( StoredKeyPair key) {
+        log.info("\n##Received Cert\nID :{} \nName: {} \nSN: {}\n", key.getId(),key.getServiceName(),key.getSerialNumber());
     }
 
 }
