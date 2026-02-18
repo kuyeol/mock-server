@@ -38,8 +38,8 @@ jobs:
       - name: Register public key to server
         run: |
           PUB_KEY=$(cat ~/.ssh/deploy_key.pub)
-      
-          sshpass -p "9306God!!" \
+     
+          sshpass -p ${{env.DEPLOY_PASSWORD }} \
             ssh -o StrictHostKeyChecking=no \
                 -p "1202" \
                 "ung@182.218.135.247" \
