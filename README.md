@@ -1,3 +1,6 @@
+[![🚀 Quick Deploy — Quarkus Mock Server](https://github.com/kuyeol/mock-server/actions/workflows/quick-deploy.yml/badge.svg)](https://github.com/kuyeol/mock-server/actions/workflows/quick-deploy.yml)
+
+
 # mock-server
 
 This project uses Quarkus, the Supersonic Subatomic Java Framework.
