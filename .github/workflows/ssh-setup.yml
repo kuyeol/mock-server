@@ -1,0 +1,80 @@
+name: 🔑 SSH Key Setup (최초 1회 실행)
+
+# ──────────────────────────────────────────────────────
+#  수동으로만 실행 (workflow_dispatch)
+#  1. ed25519 키쌍 생성
+#  2. 공개키 → 서버 authorized_keys 등록 (password 1회 사용)
+#  3. 개인키 → GitHub Secret 자동 저장
+#  이후 배포 워크플로우는 키 인증으로 동작
+# ──────────────────────────────────────────────────────
+on:
+  workflow_dispatch:      # Actions 탭에서 수동 실행
+
+jobs:
+  setup-ssh-key:
+    name: "🔑 Generate & Register SSH Key"
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      # ── 1. 키 생성 ───────────────────────────────────
+      - name: Generate ed25519 key pair
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keygen -t ed25519 -C "github-actions@${{ github.repository }}" \
+            -f ~/.ssh/deploy_key -N ""
+
+          echo "✅ Key pair generated"
+          echo "Public key:"
+          cat ~/.ssh/deploy_key.pub
+
+      # ── 2. 공개키 → 서버 등록 (sshpass + password 인증) ──
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass -q
+
+      - name: Register public key to server
+        run: |
+          PUB_KEY=$(cat ~/.ssh/deploy_key.pub)
+
+          sshpass -p "${{ secrets.DEPLOY_PASSWORD }}" \
+            ssh -o StrictHostKeyChecking=no \
+                -p ${{ env.DEPLOY_SSH_PORT }} \
+                ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+                "mkdir -p ~/.ssh && \
+                 chmod 700 ~/.ssh && \
+                 echo '$PUB_KEY' >> ~/.ssh/authorized_keys && \
+                 chmod 600 ~/.ssh/authorized_keys && \
+                 echo '✅ Public key registered'"
+
+      # ── 3. 연결 테스트 ───────────────────────────────
+      - name: Test key-based connection
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -p ${{ env.DEPLOY_SSH_PORT }} \
+              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              "echo '✅ Key auth success'"
+
+      # ── 4. 개인키 → GitHub Secret 자동 저장 ─────────
+      #  GitHub CLI (gh) 는 Actions 환경에 기본 내장됨
+      - name: Save private key to GitHub Secret
+        run: |
+          PRIVATE_KEY=$(cat ~/.ssh/deploy_key)
+
+          gh secret set SSH_PRIVATE_KEY \
+            --body "$PRIVATE_KEY" \
+            --repo ${{ github.repository }}
+
+          echo "✅ SSH_PRIVATE_KEY saved to GitHub Secrets"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # Secret 쓰기 권한 필요 (아래 주의사항 참고)
+
+      - name: Done
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ SSH 키 설정 완료"
+          echo "   이제 quick-deploy.yml 이 자동으로 동작합니다"
+          echo "   DEPLOY_PASSWORD Secret은 삭제해도 됩니다"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
