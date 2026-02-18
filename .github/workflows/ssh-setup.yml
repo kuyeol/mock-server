@@ -36,9 +36,9 @@ jobs:
 
       - name: Register public key to server
         env:
-          _PORT: ${{ env.DEPLOY_SSH_PORT }}   # ← YAML 치환 → bash 변수로 전달
-          _HOST: ${{ env.DEPLOY_HOST }}
-          _USER: ${{ env.DEPLOY_USER }}
+          _PORT: ${ env.DEPLOY_SSH_PORT }   # ← YAML 치환 → bash 변수로 전달
+          _HOST: ${ env.DEPLOY_HOST }
+          _USER: ${ env.DEPLOY_USER }
         run: |
           PUB_KEY=$(cat ~/.ssh/deploy_key.pub)
           
