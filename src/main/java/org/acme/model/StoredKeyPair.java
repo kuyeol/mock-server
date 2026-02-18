@@ -13,12 +13,12 @@ public class StoredKeyPair {
     private final byte[] trustStore;
 
 
-    public StoredKeyPair(String id, String serviceName, String serialNumber, Long expiration, byte[] keyStore, byte[] trustkey) {
+    public StoredKeyPair(String id, String serviceName, String serialNumber, Long expiration, byte[] keyStore, byte[] trustStore) {
         this.id = Objects.requireNonNull(id, "ID는 필수입니다.");
         this.serviceName = Objects.requireNonNull(serviceName, "ServiceName은 필수입니다.");
         this.serialNumber = Objects.requireNonNull(serialNumber, "S/N is Null");
         this.keyStore = Objects.requireNonNull(keyStore, "keystore os null");
-        this.trustStore = Objects.requireNonNull(trustkey, "truststore is null");
+        this.trustStore = Objects.requireNonNull(trustStore, "truststore is null");
         this.expiration = expiration;
     }
 
