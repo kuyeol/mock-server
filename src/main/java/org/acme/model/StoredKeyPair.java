@@ -1,5 +1,6 @@
 package org.acme.model;
 
+
 import java.util.Objects;
 
 public class StoredKeyPair {
@@ -9,8 +10,7 @@ public class StoredKeyPair {
     private final String serialNumber;
     private final Long expiration;
     private final byte[] keyStore;
-    private final byte[] trustkey;
-
+    private final byte[] trustStore;
 
 
     public StoredKeyPair(String id, String serviceName, String serialNumber, Long expiration, byte[] keyStore, byte[] trustkey) {
@@ -18,7 +18,7 @@ public class StoredKeyPair {
         this.serviceName = Objects.requireNonNull(serviceName, "ServiceName은 필수입니다.");
         this.serialNumber = Objects.requireNonNull(serialNumber, "S/N is Null");
         this.keyStore = Objects.requireNonNull(keyStore, "keystore os null");
-        this.trustkey = Objects.requireNonNull(trustkey, "truststore is null");
+        this.trustStore = Objects.requireNonNull(trustkey, "truststore is null");
         this.expiration = expiration;
     }
 
@@ -44,7 +44,7 @@ public class StoredKeyPair {
     }
 
     public byte[] getTrustStore() {
-        return trustkey;
+        return trustStore;
     }
 
 }
