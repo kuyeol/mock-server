@@ -77,13 +77,13 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           # 커스텀 포트로 호스트 키 스캔
-          ssh-keyscan -p ${{ env.DEPLOY_SSH_PORT }} ung@${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p ${{ vars.DEPLOY_SSH_PORT }} ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
       - name: Deploy to server
         run: |
-            ssh -p ${{ env.DEPLOY_SSH_PORT }} \
-                ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} bash -s << 'EOF'
+            ssh -p ${{ vars.DEPLOY_SSH_PORT }} \
+                ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} bash -s << 'EOF'
               set -e
               IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
             
