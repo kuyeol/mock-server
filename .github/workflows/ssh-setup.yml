@@ -34,14 +34,15 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get install -y sshpass -q
 
+        
       - name: Register public key to server
         run: |
           PUB_KEY=$(cat ~/.ssh/deploy_key.pub)
-          
-          sshpass -p "$DEPLOY_PASSWORD" \
+     
+          sshpass -p ${{secrets.DEPLOY_PASSWORD }} \
             ssh -o StrictHostKeyChecking=no \
-                -p "$_PORT" \
-                "$_USER@$_HOST" \
+                -p ${{vars.DEPLOY_SSH_PORT}} \
+                 ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
                 "mkdir -p ~/.ssh && \
                  chmod 700 ~/.ssh && \
                  echo '$PUB_KEY' >> ~/.ssh/authorized_keys && \
@@ -53,8 +54,8 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
-              -p ${{ env.DEPLOY_SSH_PORT }} \
-              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              -p ${{ vars.DEPLOY_SSH_PORT }} \
+              ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
               "echo '✅ Key auth success'"
 
       # ── 4. 개인키 → GitHub Secret 자동 저장 ─────────
