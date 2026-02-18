@@ -13,8 +13,6 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   APP_NAME: mock-server                      # ← 컨테이너 이름
-  DEPLOY_USER: ung                        # ← SSH 접속 계정
-  DEPLOY_HOST: 0.0.0.0               # ← 배포 서버 호스트
   APP_PORT: 8282                             # ← 앱 포트
 
 jobs:
@@ -78,30 +76,34 @@ jobs:
       - name: Add server to known hosts
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          # 커스텀 포트로 호스트 키 스캔
+          ssh-keyscan -p ${{ env.DEPLOY_SSH_PORT }} ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Deploy to server
         run: |
-          ssh ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} bash -s << 'EOF'
-            set -e
-            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-
-            echo "${{ secrets.GITHUB_TOKEN }}" | \
-              docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-            docker pull "$IMAGE"
-            docker stop ${{ env.APP_NAME }} 2>/dev/null || true
-            docker rm   ${{ env.APP_NAME }} 2>/dev/null || true
-
-            docker run -d \
-              --name ${{ env.APP_NAME }} \
-              --restart unless-stopped \
-              -p ${{ env.APP_PORT }}:8080 \
-              "$IMAGE"
-
-            docker image prune -f
-            echo "✅ Done — $(docker ps --filter name=${{ env.APP_NAME }} --format '{{.Status}}')"
-          EOF
+            ssh -p ${{ env.DEPLOY_SSH_PORT }} \
+                ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} bash -s << 'EOF'
+              set -e
+              IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            
+              echo "${{ secrets.GITHUB_TOKEN }}" | \
+                docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+              docker pull "$IMAGE"
+              docker stop ${{ env.APP_NAME }} 2>/dev/null || true
+              docker rm   ${{ env.APP_NAME }} 2>/dev/null || true
+            
+              docker run -d \
+                --name ${{ env.APP_NAME }} \
+                --restart unless-stopped \
+                -p ${{ env.APP_PORT }}:8080 \
+                "$IMAGE"
+            
+              docker image prune -f
+              echo "✅ Done — $(docker ps --filter name=${{ env.APP_NAME }} --format '{{.Status}}')"
+            EOF
+      
 
       # ── 헬스체크 ─────────────────────────────────────────
       - name: Health check
