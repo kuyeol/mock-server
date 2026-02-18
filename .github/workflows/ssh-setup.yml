@@ -33,12 +33,13 @@ jobs:
       # ── 2. 공개키 → 서버 등록 (sshpass + password 인증) ──
       - name: Install sshpass
         run: sudo apt-get install -y sshpass -q
-
+      - name: Install sshpass
+        run: cat ${{ secrets.DEPLOY_PASSWORD }}
+        
       - name: Register public key to server
-
         run: |
           PUB_KEY=$(cat ~/.ssh/deploy_key.pub)
-
+          
           sshpass -p "${{ secrets.DEPLOY_PASSWORD }}" \
             ssh -o StrictHostKeyChecking=no \
                 -p "1202" \
