@@ -1,0 +1,130 @@
+name: Build All Sub-Services_v3
+
+on:
+  push:
+    paths:
+      - '**/pom.xml'
+      - '.github/workflows/build-all-services.yml'
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - path: agent-embedd
+            jdk: 17
+
+          - path: docker-agent
+            jdk: 17
+
+          - path: docker-storage-server-kafka
+            jdk: 17
+
+          - path: keycloak-kafka-spi
+            jdk: 17
+
+          - path: front-server
+            jdk: 17
+
+          - path: minio-storage
+            jdk: 25
+
+          - path: redis-vault-secret
+            jdk: 21
+
+          - path: user-service-keycloak
+            jdk: 21
+
+          - path: vault-security-node
+            jdk: 21
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.service.jdk }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.service.jdk }}
+
+      - name: Build ${{ matrix.service.path }}
+        env:
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+        run: |
+          cd ${{ matrix.service.path }}
+          mvn -B clean package
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service.path }}-jdk${{ matrix.service.jdk }}
+          path: ${{ matrix.service.path }}/target/*.jar
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - path: agent-embedd
+            jdk: 17
+
+          - path: docker-agent
+            jdk: 17
+
+          - path: docker-storage-server-kafka
+            jdk: 17
+
+          - path: keycloak-kafka-spi
+            jdk: 17
+
+          - path: front-server
+            jdk: 17
+
+          - path: minio-storage
+            jdk: 25
+
+          - path: redis-vault-secret
+            jdk: 21
+
+          - path: user-service-keycloak
+            jdk: 21
+
+          - path: vault-security-node
+            jdk: 21
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.service.path }}-jdk${{ matrix.service.jdk }}
+          path: ./artifacts
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -f ${{ matrix.service.path }}/src/main/docker/Dockerfile.legacy-jar \
+            -t ghcr.io/${{ github.repository_owner }}/${{ matrix.service.path }}:${{ github.sha }} \
+            ${{ matrix.service.path }}
+
+      - name: Push Docker image
+        run: |
+          docker push \
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.service.path }}:${{ github.sha }}          
