@@ -39,7 +39,7 @@ jobs:
         run: |
           PUB_KEY=$(cat ~/.ssh/deploy_key.pub)
 
-          sshpass -p "${{ env.DEPLOY_PASSWORD }}" \
+          sshpass -p "${{ secrets.DEPLOY_PASSWORD }}" \
             ssh -o StrictHostKeyChecking=no \
                 -p "1202" \
                 "182.218.135.247" \
