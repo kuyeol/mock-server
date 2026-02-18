@@ -43,9 +43,8 @@ jobs:
       # ── 빌드 (테스트 생략 — 속도 우선) ──────────────────
       - name: Maven Build (fast-jar, skip tests)
         run: |
-          mvn -B package \
-            -Dquarkus.package.type=jar \
-            -DskipTests -q
+          mvn -B package 
+           
 
       # ── Docker ───────────────────────────────────────────
       - name: Set up Docker Buildx
