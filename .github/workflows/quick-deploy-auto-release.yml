@@ -1,0 +1,139 @@
+name: 🚀 Quick Deploy — Quarkus Mock Server (Auto Release)
+
+# ──────────────────────────────────────────
+#  자동 태그 생성 + GitHub Release 업로드
+#  master 브랜치 푸시 → 자동 릴리즈
+# ──────────────────────────────────────────
+on:
+  push:
+    branches: ["master"]
+
+env:
+  JAVA_VERSION: "21"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  APP_NAME: mock-server
+  APP_PORT: 8282
+
+jobs:
+  build-and-deploy:
+    name: "Build → Tag → Release → Docker → Deploy"
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write      # ← 태그 생성 권한 추가
+      packages: write      # GHCR push 권한
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      # ── 버전 추출 (pom.xml) ──────────────────────
+      - name: Extract version from pom.xml
+        id: version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed 's/-SNAPSHOT//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Extracted Version: $VERSION"
+
+      # ── 빌드 ──────────────────────────────────
+      - name: Maven Build (fast-jar, skip tests)
+        run: mvn -B package
+
+      # ── JAR 파일 찾기 (Broken pipe 해결) ──────
+      - name: Find JAR file
+        id: jar-file
+        run: |
+          JAR_FILE=$(find target -name "*.jar" -type f -print -quit)
+          if [ -z "$JAR_FILE" ]; then
+            echo "❌ No JAR file found in target directory"
+            exit 1
+          fi
+          echo "jar_path=$JAR_FILE" >> $GITHUB_OUTPUT
+          echo "✅ Found JAR: $JAR_FILE"
+
+      # ── 자동 태그 생성 ────────────────────────
+      - name: Generate and push tag
+        id: tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TIMESTAMP=$(date +%s)
+          TAG="v${VERSION}-${TIMESTAMP}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag "$TAG"
+          git push origin "$TAG"
+          
+          echo "🏷️  Created and pushed tag: $TAG"
+
+      # ── GitHub Release 생성 ──────────────────
+      - name: Create GitHub Release with JAR
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          files: ${{ steps.jar-file.outputs.jar_path }}
+          body: |
+            ## 🚀 Auto Release
+            - **Version**: ${{ steps.version.outputs.version }}
+            - **Tag**: ${{ steps.tag.outputs.tag }}
+            - **Commit**: ${{ github.sha }}
+            - **Author**: ${{ github.actor }}
+            - **Build Time**: $(date)
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Docker Buildx 설정 ───────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Docker 이미지 빌드 및 푸시 ──────────
+      - name: Build & Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: src/main/docker/Dockerfile.jvm
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── SSH 배포 ─────────────────────────────
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ vars.DEPLOY_SSH_PORT }} ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          ssh -p ${{ vars.DEPLOY_SSH_PORT }} ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            "cd ${{ vars.DEPLOY_DIR }} && \
+             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }} && \
+             docker-compose up -d && \
+             echo '✅ Deployment completed'"

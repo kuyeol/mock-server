@@ -1,0 +1,111 @@
+name: 🚀 Auto Release with Tag
+
+on:
+  push:
+    branches: ["master"]
+
+env:
+  JAVA_VERSION: "21"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-release:
+    name: "Build → Tag → Release → Docker"
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write      # 태그 생성 권한
+      packages: write      # GHCR push 권한
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      # ── 버전 추출 (pom.xml에서) ──────────────────────
+      - name: Extract version from pom.xml
+        id: version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed 's/-SNAPSHOT//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION"
+
+      # ── 빌드 ──────────────────────────────────────
+      - name: Maven Build
+        run: mvn -B package
+
+      # ── JAR 파일 찾기 (Broken pipe 해결) ──────────
+      - name: Find JAR file
+        id: jar-file
+        run: |
+          JAR_FILE=$(find target -name "*.jar" -type f -print -quit)
+          if [ -z "$JAR_FILE" ]; then
+            echo "❌ No JAR file found"
+            exit 1
+          fi
+          echo "jar_path=$JAR_FILE" >> $GITHUB_OUTPUT
+          echo "✅ Found JAR: $JAR_FILE"
+
+      # ── 기존 태그 확인 및 증분 버전 생성 ──────────
+      - name: Generate tag
+        id: tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TIMESTAMP=$(date +%s)
+          TAG="v${VERSION}-${TIMESTAMP}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "🏷️  Generated tag: $TAG"
+
+      # ── Git 태그 생성 ────────────────────────────
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git tag "${{ steps.tag.outputs.tag }}"
+          git push origin "${{ steps.tag.outputs.tag }}"
+
+      # ── GitHub Release 생성 ──────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          files: ${{ steps.jar-file.outputs.jar_path }}
+          body: |
+            ## 🚀 Auto Release
+            - **Version**: ${{ steps.version.outputs.version }}
+            - **Commit**: ${{ github.sha }}
+            - **Build Time**: ${{ steps.tag.outputs.tag }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Docker 빌드 및 푸시 ──────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: src/main/docker/Dockerfile.jvm
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
