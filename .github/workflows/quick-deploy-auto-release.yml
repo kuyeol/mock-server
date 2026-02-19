@@ -132,8 +132,24 @@ jobs:
 
       - name: Deploy to server
         run: |
-          ssh -p ${{ vars.DEPLOY_SSH_PORT }} ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
-            "cd ${{ vars.DEPLOY_DIR }} && \
-             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }} && \
-             docker-compose up -d && \
-             echo '✅ Deployment completed'"
+          ssh -p ${{ vars.DEPLOY_SSH_PORT }} \
+              ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} bash -s << 'EOF'
+            set -e
+            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}"
+          
+            echo "${{ secrets.GITHUB_TOKEN }}" | \
+              docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+            docker pull "$IMAGE"
+            docker stop ${{ env.APP_NAME }} 2>/dev/null || true
+            docker rm   ${{ env.APP_NAME }} 2>/dev/null || true
+          
+            docker run -d \
+              --name ${{ env.APP_NAME }} \
+              --restart unless-stopped \
+              -p ${{ env.APP_PORT }}:8080 \
+              "$IMAGE"
+          
+            docker image prune -f
+            echo "✅ Done — $(docker ps --filter name=${{ env.APP_NAME }} --format '{{.Status}}')"
+          EOF
